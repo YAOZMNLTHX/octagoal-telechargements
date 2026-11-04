@@ -1,0 +1,25 @@
+# Publie une version : les fichiers arrivent découpés en morceaux de moins de 100 Mo sur la branche « envoi-<version> »
+# (limite de GitHub par fichier) ; ce robot les recolle et crée la version téléchargeable (Release), puis supprime la branche.
+name: Publier une version
+on:
+  push:
+    branches: ['envoi-*']
+permissions:
+  contents: write
+jobs:
+  publier:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Recoller les fichiers et publier
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          V="${GITHUB_REF_NAME#envoi-}"
+          mkdir -p sortie
+          for base in $(ls envoi/ | sed 's/\.part[0-9]*$//' | sort -u); do cat $(ls envoi/$base.part* | sort -V) > "sortie/$base"; done
+          ls -la sortie
+          NOTES=$(cat envoi/NOTES.txt 2>/dev/null || echo "Octagoal Arena $V")
+          gh release create "v$V" sortie/* --target main --title "Octagoal Arena $V" --notes "$NOTES"
+          git push origin --delete "$GITHUB_REF_NAME"
